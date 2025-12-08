@@ -1,14 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
+import { jsPDF } from "jspdf";
 
 type CoverLetterMode = "standard" | "concise" | "storytelling" | "technical";
+type CoverLetterLanguage = "auto" | "spanish" | "english";
 
 export default function GeneratePage() {
   const [cv, setCv] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [count, setCount] = useState(3);
   const [mode, setMode] = useState<CoverLetterMode>("standard");
+  const [language, setLanguage] = useState<CoverLetterLanguage>("auto");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [letters, setLetters] = useState<string[]>([]);
@@ -27,7 +30,13 @@ export default function GeneratePage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ cv, jobDescription, count, mode }),
+        body: JSON.stringify({
+          cv,
+          jobDescription,
+          count,
+          mode,
+          language,
+        }),
       });
 
       if (!res.ok) {
@@ -53,10 +62,92 @@ export default function GeneratePage() {
     try {
       await navigator.clipboard.writeText(letter);
       setCopiedIndex(index);
-      // feedback por 2 segundos
       setTimeout(() => setCopiedIndex(null), 2000);
     } catch {
       setError("No se pudo copiar la carta al portapapeles.");
+    }
+  }
+
+  // 🔽 Generar PDF de UNA carta
+  function downloadSinglePdf(letter: string, index: number) {
+    try {
+      const doc = new jsPDF({
+        unit: "pt",
+        format: "a4",
+      });
+
+      const margin = 40;
+      const lineHeight = 16;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const maxWidth = pageWidth - margin * 2;
+
+      const lines = doc.splitTextToSize(letter, maxWidth);
+
+      let cursorY = margin;
+
+      lines.forEach((line: string) => {
+        if (cursorY + lineHeight > pageHeight - margin) {
+          doc.addPage();
+          cursorY = margin;
+        }
+        doc.text(line, margin, cursorY);
+        cursorY += lineHeight;
+      });
+
+      doc.save(`cover-letter-${index + 1}.pdf`);
+    } catch (e) {
+      console.error(e);
+      setError("No se pudo generar el PDF de la carta.");
+    }
+  }
+
+  // 🔽 Generar PDF con TODAS las cartas (1 carta por página)
+  function downloadAllPdf() {
+    if (letters.length === 0) return;
+
+    try {
+      const doc = new jsPDF({
+        unit: "pt",
+        format: "a4",
+      });
+
+      const margin = 40;
+      const lineHeight = 16;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const maxWidth = pageWidth - margin * 2;
+
+      letters.forEach((letter, idx) => {
+        if (idx > 0) {
+          doc.addPage();
+        }
+
+        const header = `Carta #${idx + 1}`;
+        let cursorY = margin;
+
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text(header, margin, cursorY);
+        cursorY += lineHeight * 1.5;
+
+        doc.setFont("helvetica", "normal");
+        const lines = doc.splitTextToSize(letter, maxWidth);
+
+        lines.forEach((line: string) => {
+          if (cursorY + lineHeight > pageHeight - margin) {
+            doc.addPage();
+            cursorY = margin;
+          }
+          doc.text(line, margin, cursorY);
+          cursorY += lineHeight;
+        });
+      });
+
+      doc.save("cover-letters.pdf");
+    } catch (e) {
+      console.error(e);
+      setError("No se pudo generar el PDF con todas las cartas.");
     }
   }
 
@@ -97,6 +188,7 @@ export default function GeneratePage() {
           </div>
 
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            {/* Número de cartas */}
             <div className="flex items-center gap-3">
               <label className="text-sm font-medium">
                 Número de cartas a generar
@@ -111,8 +203,8 @@ export default function GeneratePage() {
               />
             </div>
 
-            {/* SELECT DE MODO / ESTILO */}
-            <div className="flex items-center gap-3 mt-2 md:mt-0">
+            {/* Estilo de carta */}
+            <div className="flex items-center gap-3">
               <label className="text-sm font-medium">Estilo de carta</label>
               <select
                 value={mode}
@@ -124,7 +216,27 @@ export default function GeneratePage() {
                 </option>
                 <option value="concise">Breve y directa</option>
                 <option value="storytelling">Storytelling / narrativa</option>
-                <option value="technical">Muy técnica (roles de ingeniería)</option>
+                <option value="technical">
+                  Muy técnica (roles de ingeniería)
+                </option>
+              </select>
+            </div>
+
+            {/* Idioma */}
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium">Idioma de la carta</label>
+              <select
+                value={language}
+                onChange={(e) =>
+                  setLanguage(e.target.value as CoverLetterLanguage)
+                }
+                className="rounded-lg bg-slate-950 border border-slate-700 px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="auto">
+                  Detectar automáticamente (según la vacante)
+                </option>
+                <option value="spanish">Español</option>
+                <option value="english">English</option>
               </select>
             </div>
           </div>
@@ -144,7 +256,18 @@ export default function GeneratePage() {
 
         {letters.length > 0 && (
           <section className="mt-6 space-y-4">
-            <h2 className="text-lg font-semibold">Cartas generadas</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-semibold">Cartas generadas</h2>
+
+              <button
+                type="button"
+                onClick={downloadAllPdf}
+                className="text-xs px-3 py-1 rounded-lg border border-emerald-500 text-emerald-400 hover:bg-emerald-500/10 transition"
+              >
+                Descargar todas en PDF
+              </button>
+            </div>
+
             {letters.map((letter, idx) => (
               <article
                 key={idx}
@@ -154,13 +277,22 @@ export default function GeneratePage() {
                   <div className="text-xs text-slate-400">
                     Carta #{idx + 1}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(letter, idx)}
-                    className="text-xs px-2 py-1 rounded-lg border border-emerald-500 text-emerald-400 hover:bg-emerald-500/10 transition"
-                  >
-                    {copiedIndex === idx ? "Copiada ✓" : "Copiar"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(letter, idx)}
+                      className="text-xs px-2 py-1 rounded-lg border border-emerald-500 text-emerald-400 hover:bg-emerald-500/10 transition"
+                    >
+                      {copiedIndex === idx ? "Copiada ✓" : "Copiar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadSinglePdf(letter, idx)}
+                      className="text-xs px-2 py-1 rounded-lg border border-slate-500 text-slate-200 hover:bg-slate-700/60 transition"
+                    >
+                      PDF
+                    </button>
+                  </div>
                 </div>
                 {letter}
               </article>

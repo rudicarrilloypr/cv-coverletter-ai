@@ -5,6 +5,7 @@ const openai = new OpenAI({
 });
 
 type CoverLetterMode = "standard" | "concise" | "storytelling" | "technical";
+type CoverLetterLanguage = "auto" | "spanish" | "english";
 
 export async function POST(req: Request) {
   try {
@@ -13,6 +14,7 @@ export async function POST(req: Request) {
     const jobDescription = body.jobDescription as string | undefined;
     const countRaw = body.count as number | undefined;
     const modeRaw = body.mode as string | undefined;
+    const languageRaw = body.language as string | undefined;
 
     if (!cv || !jobDescription) {
       return Response.json(
@@ -21,6 +23,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // entre 1 y 10 cartas
     const count = Math.min(Math.max(Number(countRaw) || 3, 1), 10);
 
     const mode: CoverLetterMode =
@@ -29,6 +32,11 @@ export async function POST(req: Request) {
       modeRaw === "technical"
         ? modeRaw
         : "standard";
+
+    const language: CoverLetterLanguage =
+      languageRaw === "spanish" || languageRaw === "english"
+        ? languageRaw
+        : "auto";
 
     const modeInstructions =
       mode === "concise"
@@ -39,6 +47,13 @@ export async function POST(req: Request) {
         ? "Enfatiza habilidades técnicas, stack tecnológico, métricas y resultados medibles, y palabras clave relevantes para roles de ingeniería o data."
         : "Haz cartas profesionales balanceadas: buen tono humano, estructura clásica, y foco en logros relevantes.";
 
+    const languageInstructions =
+      language === "spanish"
+        ? "Todas las cartas deben estar escritas en ESPAÑOL, sin mezclar idiomas."
+        : language === "english"
+        ? "All cover letters must be written in ENGLISH only, do not mix with Spanish."
+        : "Escribe en el idioma principal de la descripción del puesto (español o inglés).";
+
     const prompt = `
 Eres un experto en redacción de cartas de presentación y career coaching.
 
@@ -46,12 +61,14 @@ TAREA:
 - Escribe ${count} cartas de presentación diferentes.
 - Cada carta debe estar adaptada al CV y a la descripción del puesto.
 - Usa un tono profesional, humano y convincente.
-- Escribe en el mismo idioma en el que esté la descripción (español/inglés).
 
 MODO SELECCIONADO POR EL USUARIO: "${mode}"
 
 INSTRUCCIONES DE ESTILO PARA ESTE MODO:
 ${modeInstructions}
+
+INSTRUCCIONES DE IDIOMA:
+${languageInstructions}
 
 FORMATO DE RESPUESTA (MUY IMPORTANTE):
 Responde ÚNICAMENTE con un JSON válido con esta forma exacta:
