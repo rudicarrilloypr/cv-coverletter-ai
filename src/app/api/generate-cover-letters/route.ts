@@ -15,6 +15,7 @@ export async function POST(req: Request) {
     const countRaw = body.count as number | undefined;
     const modeRaw = body.mode as string | undefined;
     const languageRaw = body.language as string | undefined;
+    const userName = body.userName as string | undefined; // 👈 nombre
 
     if (!cv || !jobDescription) {
       return Response.json(
@@ -23,7 +24,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // entre 1 y 10 cartas
     const count = Math.min(Math.max(Number(countRaw) || 3, 1), 10);
 
     const mode: CoverLetterMode =
@@ -54,6 +54,11 @@ export async function POST(req: Request) {
         ? "All cover letters must be written in ENGLISH only, do not mix with Spanish."
         : "Escribe en el idioma principal de la descripción del puesto (español o inglés).";
 
+    const signatureInstructions = userName
+      ? `Al final de CADA carta, añade una línea de firma con este nombre EXACTO, sin modificarlo ni inventar otros nombres:
+"${userName}"`
+      : "No añadas firma con nombre al final; deja que la persona agregue su nombre si lo desea.";
+
     const prompt = `
 Eres un experto en redacción de cartas de presentación y career coaching.
 
@@ -69,6 +74,9 @@ ${modeInstructions}
 
 INSTRUCCIONES DE IDIOMA:
 ${languageInstructions}
+
+INSTRUCCIONES DE FIRMA:
+${signatureInstructions}
 
 FORMATO DE RESPUESTA (MUY IMPORTANTE):
 Responde ÚNICAMENTE con un JSON válido con esta forma exacta:

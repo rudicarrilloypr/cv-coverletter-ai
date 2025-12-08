@@ -12,6 +12,7 @@ export default function GeneratePage() {
   const [count, setCount] = useState(3);
   const [mode, setMode] = useState<CoverLetterMode>("standard");
   const [language, setLanguage] = useState<CoverLetterLanguage>("auto");
+  const [userName, setUserName] = useState(""); // 👈 nombre para firma
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [letters, setLetters] = useState<string[]>([]);
@@ -36,6 +37,7 @@ export default function GeneratePage() {
           count,
           mode,
           language,
+          userName, // 👈 enviamos el nombre a la API
         }),
       });
 
@@ -68,7 +70,6 @@ export default function GeneratePage() {
     }
   }
 
-  // 🔽 Generar PDF de UNA carta
   function downloadSinglePdf(letter: string, index: number) {
     try {
       const doc = new jsPDF({
@@ -102,7 +103,6 @@ export default function GeneratePage() {
     }
   }
 
-  // 🔽 Generar PDF con TODAS las cartas (1 carta por página)
   function downloadAllPdf() {
     if (letters.length === 0) return;
 
@@ -163,6 +163,23 @@ export default function GeneratePage() {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Nombre del usuario */}
+          <div>
+            <label className="block text-sm mb-1 font-medium">
+              Tu nombre completo (para firmar la carta)
+            </label>
+            <input
+              type="text"
+              className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              value={userName}
+              onChange={(e) => setUserName(e.target.value)}
+              placeholder="Ej. John P."
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              Si lo dejas vacío, la carta no llevará firma automática.
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm mb-1 font-medium">Tu CV</label>
             <textarea
@@ -188,7 +205,6 @@ export default function GeneratePage() {
           </div>
 
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            {/* Número de cartas */}
             <div className="flex items-center gap-3">
               <label className="text-sm font-medium">
                 Número de cartas a generar
@@ -203,7 +219,6 @@ export default function GeneratePage() {
               />
             </div>
 
-            {/* Estilo de carta */}
             <div className="flex items-center gap-3">
               <label className="text-sm font-medium">Estilo de carta</label>
               <select
@@ -222,7 +237,6 @@ export default function GeneratePage() {
               </select>
             </div>
 
-            {/* Idioma */}
             <div className="flex items-center gap-3">
               <label className="text-sm font-medium">Idioma de la carta</label>
               <select
