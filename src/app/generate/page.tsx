@@ -2,19 +2,24 @@
 
 import React, { useState } from "react";
 
+type CoverLetterMode = "standard" | "concise" | "storytelling" | "technical";
+
 export default function GeneratePage() {
   const [cv, setCv] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [count, setCount] = useState(3);
+  const [mode, setMode] = useState<CoverLetterMode>("standard");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [letters, setLetters] = useState<string[]>([]);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLetters([]);
     setLoading(true);
+    setCopiedIndex(null);
 
     try {
       const res = await fetch("/api/generate-cover-letters", {
@@ -22,7 +27,7 @@ export default function GeneratePage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ cv, jobDescription, count }),
+        body: JSON.stringify({ cv, jobDescription, count, mode }),
       });
 
       if (!res.ok) {
@@ -41,6 +46,17 @@ export default function GeneratePage() {
       setError(message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleCopy(letter: string, index: number) {
+    try {
+      await navigator.clipboard.writeText(letter);
+      setCopiedIndex(index);
+      // feedback por 2 segundos
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch {
+      setError("No se pudo copiar la carta al portapapeles.");
     }
   }
 
@@ -80,18 +96,37 @@ export default function GeneratePage() {
             />
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium">
-              Número de cartas a generar
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={10}
-              value={count}
-              onChange={(e) => setCount(Number(e.target.value))}
-              className="w-20 rounded-lg bg-slate-950 border border-slate-700 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-            />
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium">
+                Número de cartas a generar
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={count}
+                onChange={(e) => setCount(Number(e.target.value))}
+                className="w-20 rounded-lg bg-slate-950 border border-slate-700 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            {/* SELECT DE MODO / ESTILO */}
+            <div className="flex items-center gap-3 mt-2 md:mt-0">
+              <label className="text-sm font-medium">Estilo de carta</label>
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value as CoverLetterMode)}
+                className="rounded-lg bg-slate-950 border border-slate-700 px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="standard">
+                  Profesional balanceada (recomendada)
+                </option>
+                <option value="concise">Breve y directa</option>
+                <option value="storytelling">Storytelling / narrativa</option>
+                <option value="technical">Muy técnica (roles de ingeniería)</option>
+              </select>
+            </div>
           </div>
 
           <button
@@ -115,8 +150,17 @@ export default function GeneratePage() {
                 key={idx}
                 className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm whitespace-pre-line"
               >
-                <div className="text-xs mb-1 text-slate-400">
-                  Carta #{idx + 1}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs text-slate-400">
+                    Carta #{idx + 1}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(letter, idx)}
+                    className="text-xs px-2 py-1 rounded-lg border border-emerald-500 text-emerald-400 hover:bg-emerald-500/10 transition"
+                  >
+                    {copiedIndex === idx ? "Copiada ✓" : "Copiar"}
+                  </button>
                 </div>
                 {letter}
               </article>

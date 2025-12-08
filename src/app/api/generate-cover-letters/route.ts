@@ -4,9 +4,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-type CoverLetterResponse = {
-  letters: string[];
-};
+type CoverLetterMode = "standard" | "concise" | "storytelling" | "technical";
 
 export async function POST(req: Request) {
   try {
@@ -14,6 +12,7 @@ export async function POST(req: Request) {
     const cv = body.cv as string | undefined;
     const jobDescription = body.jobDescription as string | undefined;
     const countRaw = body.count as number | undefined;
+    const modeRaw = body.mode as string | undefined;
 
     if (!cv || !jobDescription) {
       return Response.json(
@@ -22,8 +21,23 @@ export async function POST(req: Request) {
       );
     }
 
-    // entre 1 y 10 cartas
     const count = Math.min(Math.max(Number(countRaw) || 3, 1), 10);
+
+    const mode: CoverLetterMode =
+      modeRaw === "concise" ||
+      modeRaw === "storytelling" ||
+      modeRaw === "technical"
+        ? modeRaw
+        : "standard";
+
+    const modeInstructions =
+      mode === "concise"
+        ? "Haz cada carta muy breve y directa, máximo 3 párrafos, y ve al punto rápidamente."
+        : mode === "storytelling"
+        ? "Incluye un poco de storytelling: cuenta una breve historia que conecte la experiencia de la persona con las necesidades del puesto."
+        : mode === "technical"
+        ? "Enfatiza habilidades técnicas, stack tecnológico, métricas y resultados medibles, y palabras clave relevantes para roles de ingeniería o data."
+        : "Haz cartas profesionales balanceadas: buen tono humano, estructura clásica, y foco en logros relevantes.";
 
     const prompt = `
 Eres un experto en redacción de cartas de presentación y career coaching.
@@ -32,7 +46,12 @@ TAREA:
 - Escribe ${count} cartas de presentación diferentes.
 - Cada carta debe estar adaptada al CV y a la descripción del puesto.
 - Usa un tono profesional, humano y convincente.
-- Puedes escribir en el mismo idioma en el que esté la descripción (español/inglés).
+- Escribe en el mismo idioma en el que esté la descripción (español/inglés).
+
+MODO SELECCIONADO POR EL USUARIO: "${mode}"
+
+INSTRUCCIONES DE ESTILO PARA ESTE MODO:
+${modeInstructions}
 
 FORMATO DE RESPUESTA (MUY IMPORTANTE):
 Responde ÚNICAMENTE con un JSON válido con esta forma exacta:
@@ -60,12 +79,15 @@ ${jobDescription}
       max_output_tokens: 2000,
     });
 
-    // helper del SDK: toda la salida como texto plano
-    const rawText = response.output_text ?? "";
+    const firstOutput = response.output[0] as any;
+    const textItem = firstOutput.content.find(
+      (c: any) => c.type === "output_text"
+    );
+    const rawText: string = textItem?.text ?? "";
 
-    let parsed: CoverLetterResponse;
+    let json: unknown;
     try {
-      parsed = JSON.parse(rawText) as CoverLetterResponse;
+      json = JSON.parse(rawText);
     } catch (e) {
       console.error("Error parseando JSON de OpenAI:", rawText);
       return Response.json(
@@ -74,7 +96,12 @@ ${jobDescription}
       );
     }
 
-    const letters = Array.isArray(parsed.letters) ? parsed.letters : [];
+    const letters =
+      typeof json === "object" &&
+      json !== null &&
+      Array.isArray((json as any).letters)
+        ? (json as any).letters
+        : [];
 
     return Response.json({ letters });
   } catch (err) {
