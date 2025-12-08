@@ -1,89 +1,84 @@
-import { NextResponse } from "next/server";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+type CoverLetterResponse = {
+  letters: string[];
+};
 
 export async function POST(req: Request) {
   try {
-    const { cv, jobDescription, count } = await req.json();
+    const body = await req.json();
+    const cv = body.cv as string | undefined;
+    const jobDescription = body.jobDescription as string | undefined;
+    const countRaw = body.count as number | undefined;
 
     if (!cv || !jobDescription) {
-      return NextResponse.json(
-        { error: "Missing cv or jobDescription" },
+      return Response.json(
+        { error: "Falta el CV o la descripción del puesto" },
         { status: 400 }
       );
     }
 
-    const n = Math.min(Number(count) || 3, 10);
+    // entre 1 y 10 cartas
+    const count = Math.min(Math.max(Number(countRaw) || 3, 1), 10);
 
     const prompt = `
-Eres un asistente experto en recursos humanos.
+Eres un experto en redacción de cartas de presentación y career coaching.
 
-Tarea:
-- Toma el siguiente CV del candidato.
-- Toma la siguiente descripción de vacante.
-- Genera ${n} cartas de presentación distintas, en español neutro profesional.
-- Cada carta debe:
-  - Estar adaptada a la vacante.
-  - Usar tono humano, cercano pero profesional.
-  - Tener 3–5 párrafos.
-  - No repetir exactamente las mismas frases entre cartas.
+TAREA:
+- Escribe ${count} cartas de presentación diferentes.
+- Cada carta debe estar adaptada al CV y a la descripción del puesto.
+- Usa un tono profesional, humano y convincente.
+- Puedes escribir en el mismo idioma en el que esté la descripción (español/inglés).
 
-Devuelve la respuesta en JSON con esta forma EXACTA:
+FORMATO DE RESPUESTA (MUY IMPORTANTE):
+Responde ÚNICAMENTE con un JSON válido con esta forma exacta:
+
 {
-  "letters": ["carta 1...", "carta 2...", "..."]
+  "letters": [
+    "carta 1...",
+    "carta 2...",
+    "carta 3..."
+  ]
 }
+
+No agregues texto fuera del JSON, ni comentarios, ni explicaciones.
 
 CV:
 ${cv}
 
-Job Description:
+DESCRIPCIÓN DEL PUESTO:
 ${jobDescription}
-`;
+    `.trim();
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-5.1-mini",
-        input: prompt,
-        response_format: { type: "json_object" },
-      }),
+    const response = await openai.responses.create({
+      model: "gpt-4.1-mini",
+      input: prompt,
+      max_output_tokens: 2000,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("OpenAI error:", errorText);
-      return NextResponse.json(
-        { error: "OpenAI request failed" },
-        { status: 500 }
-      );
-    }
+    // helper del SDK: toda la salida como texto plano
+    const rawText = response.output_text ?? "";
 
-    const data = await response.json();
-
-    // data.output[0].content[0].text is typical for Responses API
-    const raw = data.output?.[0]?.content?.[0]?.text ?? "{}";
-    let parsed: { letters?: string[] } = {};
-
+    let parsed: CoverLetterResponse;
     try {
-      parsed = JSON.parse(raw);
+      parsed = JSON.parse(rawText) as CoverLetterResponse;
     } catch (e) {
-      console.error("JSON parse error:", e, raw);
-      return NextResponse.json(
-        { error: "Failed to parse model output" },
+      console.error("Error parseando JSON de OpenAI:", rawText);
+      return Response.json(
+        { error: "La respuesta del modelo no fue JSON válido" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({
-      letters: parsed.letters || [],
-    });
+    const letters = Array.isArray(parsed.letters) ? parsed.letters : [];
+
+    return Response.json({ letters });
   } catch (err) {
-    console.error(err);
-    return NextResponse.json(
-      { error: "Unexpected server error" },
-      { status: 500 }
-    );
+    console.error("OpenAI error:", err);
+    return Response.json({ error: "Error calling OpenAI" }, { status: 500 });
   }
 }

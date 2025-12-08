@@ -32,16 +32,16 @@ export default function GeneratePage() {
 
       const data = await res.json();
       setLetters(data.letters || []);
-      } catch (err: unknown) {
-    if (err instanceof Error) {
-      setError(err.message || "Unexpected error");
-    } else {
-      setError("Unexpected error");
-    }
-  } finally {
-    setLoading(false);
-  }
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Unexpected error";
 
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -104,9 +104,7 @@ export default function GeneratePage() {
         </form>
 
         {error && (
-          <p className="mt-4 text-sm text-red-400">
-            Error: {error}
-          </p>
+          <p className="mt-4 text-sm text-red-400">Error: {error}</p>
         )}
 
         {letters.length > 0 && (
