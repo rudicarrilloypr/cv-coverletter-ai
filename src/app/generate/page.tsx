@@ -118,50 +118,69 @@ export default function GeneratePage() {
   const [error, setError] = useState<string | null>(null);
   const [letters, setLetters] = useState<string[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [credits, setCredits] = useState<number | null>(null);
+
 
   const t = UI_TEXTS[uiLanguage];
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLetters([]);
-    setLoading(true);
-    setCopiedIndex(null);
+async function handleSubmit(e: React.FormEvent) {
+  e.preventDefault();
+  setError(null);
+  setLetters([]);
+  setLoading(true);
+  setCopiedIndex(null);
 
+  try {
+    const res = await fetch("/api/generate-cover-letters", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        cv,
+        jobDescription,
+        count,
+        mode,
+        language,
+        userName,
+      }),
+    });
+
+    let data: any = null;
     try {
-      const res = await fetch("/api/generate-cover-letters", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          cv,
-          jobDescription,
-          count,
-          mode,
-          language,
-          userName,
-        }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Request failed");
-      }
-
-      const data = await res.json();
-      setLetters(data.letters || []);
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message?: string }).message)
-          : "Unexpected error";
-
-      setError(message);
-    } finally {
-      setLoading(false);
+      data = await res.json();
+    } catch {
+      // por si la respuesta no es JSON
     }
+
+    if (!res.ok) {
+      const apiMessage =
+        data && typeof data.error === "string" ? data.error : null;
+      throw new Error(apiMessage || "Request failed");
+    }
+
+// dentro de handleSubmit, después de `data = await res.json();`
+
+const lettersFromApi = Array.isArray(data?.letters) ? data.letters : [];
+setLetters(lettersFromApi);
+
+// 👇 NUEVO: guardar créditos restantes si vienen de la API
+if (typeof data?.remainingCredits === "number") {
+  setCredits(data.remainingCredits);
+}
+
+  } catch (err: unknown) {
+    const message =
+      err && typeof err === "object" && "message" in err
+        ? String((err as { message?: string }).message)
+        : "Unexpected error";
+
+    setError(message);
+  } finally {
+    setLoading(false);
   }
+}
+
 
   async function handleCopy(letter: string, index: number) {
     try {
@@ -386,13 +405,21 @@ export default function GeneratePage() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            {loading ? t.submitGenerating : t.submitGenerate}
-          </button>
+  <button
+  type="submit"
+  disabled={loading}
+  className="mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition"
+>
+  {loading ? t.submitGenerating : t.submitGenerate}
+</button>
+
+{credits !== null && (
+  <p className="mt-2 text-xs text-slate-400">
+    Créditos restantes: <span className="font-semibold">{credits}</span>
+  </p>
+)}
+
+          
         </form>
 
         {error && (

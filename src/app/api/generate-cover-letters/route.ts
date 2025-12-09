@@ -1,4 +1,7 @@
+// src/app/api/generate-cover-letters/route.ts
 import OpenAI from "openai";
+import { auth } from "@/app/auth";           // 👈 usamos tu helper de NextAuth
+import { prisma } from "@/app/lib/prisma";   // 👈 Prisma client
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -9,13 +12,26 @@ type CoverLetterLanguage = "auto" | "spanish" | "english";
 
 export async function POST(req: Request) {
   try {
+    // 1) Verificar sesión
+    const session = await auth();
+
+    if (!session || !session.user || !session.user.email) {
+      return Response.json(
+        { error: "Debes iniciar sesión para generar cartas." },
+        { status: 401 }
+      );
+    }
+
+    const email = session.user.email;
+
+    // 2) Leer body
     const body = await req.json();
     const cv = body.cv as string | undefined;
     const jobDescription = body.jobDescription as string | undefined;
     const countRaw = body.count as number | undefined;
     const modeRaw = body.mode as string | undefined;
     const languageRaw = body.language as string | undefined;
-    const userName = body.userName as string | undefined; // 👈 nombre
+    const userName = body.userName as string | undefined;
 
     if (!cv || !jobDescription) {
       return Response.json(
@@ -24,6 +40,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // 3) Normalizar parámetros
     const count = Math.min(Math.max(Number(countRaw) || 3, 1), 10);
 
     const mode: CoverLetterMode =
@@ -38,6 +55,36 @@ export async function POST(req: Request) {
         ? languageRaw
         : "auto";
 
+    // 4) Buscar usuario en DB
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return Response.json(
+        { error: "Usuario no encontrado en la base de datos." },
+        { status: 404 }
+      );
+    }
+
+    // 💰 5) Lógica de créditos
+    // Por ahora: 1 crédito por carta generada
+    const costPerLetter = 1;
+    const totalCost = costPerLetter * count;
+
+    if (user.credits < totalCost) {
+      return Response.json(
+        {
+          error:
+            "No tienes créditos suficientes para generar estas cartas. Compra más créditos o reduce la cantidad.",
+          currentCredits: user.credits,
+          requiredCredits: totalCost,
+        },
+        { status: 402 } // Payment Required (semánticamente tiene sentido)
+      );
+    }
+
+    // 6) Instrucciones de modo / idioma / firma
     const modeInstructions =
       mode === "concise"
         ? "Haz cada carta muy breve y directa, máximo 3 párrafos, y ve al punto rápidamente."
@@ -98,6 +145,7 @@ DESCRIPCIÓN DEL PUESTO:
 ${jobDescription}
     `.trim();
 
+    // 7) Llamar a OpenAI SOLO si hay créditos suficientes
     const response = await openai.responses.create({
       model: "gpt-4.1-mini",
       input: prompt,
@@ -128,9 +176,26 @@ ${jobDescription}
         ? (json as any).letters
         : [];
 
-    return Response.json({ letters });
+    // 8) Descontar créditos SOLO si realmente generamos cartas
+    const newCredits = user.credits - totalCost;
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        credits: newCredits,
+      },
+    });
+
+    return Response.json({
+      letters,
+      remainingCredits: newCredits,
+      spentCredits: totalCost,
+    });
   } catch (err) {
-    console.error("OpenAI error:", err);
-    return Response.json({ error: "Error calling OpenAI" }, { status: 500 });
+    console.error("OpenAI / API error:", err);
+    return Response.json(
+      { error: "Error interno al generar las cartas" },
+      { status: 500 }
+    );
   }
 }
