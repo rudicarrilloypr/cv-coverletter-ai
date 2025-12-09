@@ -39,7 +39,7 @@ const UI_TEXTS: Record<UiLanguage, {
   uiLangLabel: string;
 }> = {
   es: {
-    pageTitle: "AI Cover Letter Generator",
+    pageTitle: "Cover Letter Generator",
     pageSubtitle:
       "Pega tu CV y la descripción de la vacante. La app generará varias cartas de presentación adaptadas.",
     userNameLabel: "Tu nombre completo (para firmar la carta)",
