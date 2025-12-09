@@ -1,89 +1,136 @@
-import { NextResponse } from "next/server";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+type CoverLetterMode = "standard" | "concise" | "storytelling" | "technical";
+type CoverLetterLanguage = "auto" | "spanish" | "english";
 
 export async function POST(req: Request) {
   try {
-    const { cv, jobDescription, count } = await req.json();
+    const body = await req.json();
+    const cv = body.cv as string | undefined;
+    const jobDescription = body.jobDescription as string | undefined;
+    const countRaw = body.count as number | undefined;
+    const modeRaw = body.mode as string | undefined;
+    const languageRaw = body.language as string | undefined;
+    const userName = body.userName as string | undefined; // 👈 nombre
 
     if (!cv || !jobDescription) {
-      return NextResponse.json(
-        { error: "Missing cv or jobDescription" },
+      return Response.json(
+        { error: "Falta el CV o la descripción del puesto" },
         { status: 400 }
       );
     }
 
-    const n = Math.min(Number(count) || 3, 10);
+    const count = Math.min(Math.max(Number(countRaw) || 3, 1), 10);
+
+    const mode: CoverLetterMode =
+      modeRaw === "concise" ||
+      modeRaw === "storytelling" ||
+      modeRaw === "technical"
+        ? modeRaw
+        : "standard";
+
+    const language: CoverLetterLanguage =
+      languageRaw === "spanish" || languageRaw === "english"
+        ? languageRaw
+        : "auto";
+
+    const modeInstructions =
+      mode === "concise"
+        ? "Haz cada carta muy breve y directa, máximo 3 párrafos, y ve al punto rápidamente."
+        : mode === "storytelling"
+        ? "Incluye un poco de storytelling: cuenta una breve historia que conecte la experiencia de la persona con las necesidades del puesto."
+        : mode === "technical"
+        ? "Enfatiza habilidades técnicas, stack tecnológico, métricas y resultados medibles, y palabras clave relevantes para roles de ingeniería o data."
+        : "Haz cartas profesionales balanceadas: buen tono humano, estructura clásica, y foco en logros relevantes.";
+
+    const languageInstructions =
+      language === "spanish"
+        ? "Todas las cartas deben estar escritas en ESPAÑOL, sin mezclar idiomas."
+        : language === "english"
+        ? "All cover letters must be written in ENGLISH only, do not mix with Spanish."
+        : "Escribe en el idioma principal de la descripción del puesto (español o inglés).";
+
+    const signatureInstructions = userName
+      ? `Al final de CADA carta, añade una línea de firma con este nombre EXACTO, sin modificarlo ni inventar otros nombres:
+"${userName}"`
+      : "No añadas firma con nombre al final; deja que la persona agregue su nombre si lo desea.";
 
     const prompt = `
-Eres un asistente experto en recursos humanos.
+Eres un experto en redacción de cartas de presentación y career coaching.
 
-Tarea:
-- Toma el siguiente CV del candidato.
-- Toma la siguiente descripción de vacante.
-- Genera ${n} cartas de presentación distintas, en español neutro profesional.
-- Cada carta debe:
-  - Estar adaptada a la vacante.
-  - Usar tono humano, cercano pero profesional.
-  - Tener 3–5 párrafos.
-  - No repetir exactamente las mismas frases entre cartas.
+TAREA:
+- Escribe ${count} cartas de presentación diferentes.
+- Cada carta debe estar adaptada al CV y a la descripción del puesto.
+- Usa un tono profesional, humano y convincente.
 
-Devuelve la respuesta en JSON con esta forma EXACTA:
+MODO SELECCIONADO POR EL USUARIO: "${mode}"
+
+INSTRUCCIONES DE ESTILO PARA ESTE MODO:
+${modeInstructions}
+
+INSTRUCCIONES DE IDIOMA:
+${languageInstructions}
+
+INSTRUCCIONES DE FIRMA:
+${signatureInstructions}
+
+FORMATO DE RESPUESTA (MUY IMPORTANTE):
+Responde ÚNICAMENTE con un JSON válido con esta forma exacta:
+
 {
-  "letters": ["carta 1...", "carta 2...", "..."]
+  "letters": [
+    "carta 1...",
+    "carta 2...",
+    "carta 3..."
+  ]
 }
+
+No agregues texto fuera del JSON, ni comentarios, ni explicaciones.
 
 CV:
 ${cv}
 
-Job Description:
+DESCRIPCIÓN DEL PUESTO:
 ${jobDescription}
-`;
+    `.trim();
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-5.1-mini",
-        input: prompt,
-        response_format: { type: "json_object" },
-      }),
+    const response = await openai.responses.create({
+      model: "gpt-4.1-mini",
+      input: prompt,
+      max_output_tokens: 2000,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("OpenAI error:", errorText);
-      return NextResponse.json(
-        { error: "OpenAI request failed" },
-        { status: 500 }
-      );
-    }
-
-    const data = await response.json();
-
-    // data.output[0].content[0].text is typical for Responses API
-    const raw = data.output?.[0]?.content?.[0]?.text ?? "{}";
-    let parsed: { letters?: string[] } = {};
-
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {
-      console.error("JSON parse error:", e, raw);
-      return NextResponse.json(
-        { error: "Failed to parse model output" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      letters: parsed.letters || [],
-    });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json(
-      { error: "Unexpected server error" },
-      { status: 500 }
+    const firstOutput = response.output[0] as any;
+    const textItem = firstOutput.content.find(
+      (c: any) => c.type === "output_text"
     );
+    const rawText: string = textItem?.text ?? "";
+
+    let json: unknown;
+    try {
+      json = JSON.parse(rawText);
+    } catch (e) {
+      console.error("Error parseando JSON de OpenAI:", rawText);
+      return Response.json(
+        { error: "La respuesta del modelo no fue JSON válido" },
+        { status: 500 }
+      );
+    }
+
+    const letters =
+      typeof json === "object" &&
+      json !== null &&
+      Array.isArray((json as any).letters)
+        ? (json as any).letters
+        : [];
+
+    return Response.json({ letters });
+  } catch (err) {
+    console.error("OpenAI error:", err);
+    return Response.json({ error: "Error calling OpenAI" }, { status: 500 });
   }
 }
