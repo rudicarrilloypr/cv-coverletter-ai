@@ -7,8 +7,19 @@ import { useState } from "react";
 
 type CreditPackId = "starter" | "pro" | "ultimate";
 
+type PurchaseDTO = {
+  id: string;
+  stripeId: string;
+  packId: string;
+  credits: number;
+  amount: number;
+  currency: string;
+  createdAt: string; // ISO string
+};
+
 type BillingClientProps = {
   initialCredits: number;
+  initialPurchases: PurchaseDTO[];
 };
 
 const CREDIT_PACKS_UI: {
@@ -39,10 +50,14 @@ const CREDIT_PACKS_UI: {
   },
 ];
 
-export default function BillingClient({ initialCredits }: BillingClientProps) {
+export default function BillingClient({
+  initialCredits,
+  initialPurchases,
+}: BillingClientProps) {
   const [credits, setCredits] = useState(initialCredits);
   const [loadingPack, setLoadingPack] = useState<CreditPackId | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [purchases] = useState<PurchaseDTO[]>(initialPurchases);
 
   async function handleBuy(packId: CreditPackId) {
     try {
@@ -135,6 +150,65 @@ export default function BillingClient({ initialCredits }: BillingClientProps) {
             </button>
           </article>
         ))}
+      </section>
+
+      {/* Historial de compras */}
+      <section className="mt-8 space-y-3">
+        <h2 className="text-lg font-semibold">Historial de compras</h2>
+
+        {purchases.length === 0 ? (
+          <p className="text-sm text-slate-400">
+            Aún no has comprado créditos. Una vez que realices tu primera
+            compra, verás aquí el historial de pagos.
+          </p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/60">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-900/80">
+                <tr className="text-left text-xs uppercase tracking-wide text-slate-400">
+                  <th className="px-4 py-3">Fecha</th>
+                  <th className="px-4 py-3">Paquete</th>
+                  <th className="px-4 py-3">Créditos</th>
+                  <th className="px-4 py-3">Monto</th>
+                  <th className="px-4 py-3 hidden md:table-cell">Stripe ID</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {purchases.map((p) => {
+                  const date = new Date(p.createdAt);
+                  const formattedDate = date.toLocaleString("es-MX", {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  });
+
+                  const amountFormatted =
+                    p.amount > 0
+                      ? `${(p.amount / 100).toFixed(2)} ${p.currency.toUpperCase()}`
+                      : "-";
+
+                  const packLabel =
+                    p.packId.charAt(0).toUpperCase() + p.packId.slice(1);
+
+                  return (
+                    <tr key={p.id} className="text-slate-200">
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {formattedDate}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {packLabel}
+                      </td>
+                      <td className="px-4 py-3">{p.credits}</td>
+                      <td className="px-4 py-3">{amountFormatted}</td>
+                      <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">
+                        {p.stripeId}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <p className="text-xs text-slate-500 mt-4">
