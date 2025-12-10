@@ -1,7 +1,7 @@
 // src/app/api/generate-cover-letters/route.ts
 import OpenAI from "openai";
-import { auth } from "@/app/auth";           // 👈 usamos tu helper de NextAuth
-import { prisma } from "@/app/lib/prisma";   // 👈 Prisma client
+import { auth } from "@/app/auth";
+import { prisma } from "@/app/lib/prisma";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -9,6 +9,20 @@ const openai = new OpenAI({
 
 type CoverLetterMode = "standard" | "concise" | "storytelling" | "technical";
 type CoverLetterLanguage = "auto" | "spanish" | "english";
+
+interface GenerateLettersBody {
+  cv?: string;
+  jobDescription?: string;
+  count?: number;
+  mode?: CoverLetterMode | string;
+  language?: CoverLetterLanguage | string;
+  userName?: string;
+}
+
+// Tipo mínimo que nos sirve para leer el output del modelo
+type OpenAIOutputItem = {
+  content: { type: string; text?: string }[];
+};
 
 export async function POST(req: Request) {
   try {
@@ -24,14 +38,14 @@ export async function POST(req: Request) {
 
     const email = session.user.email;
 
-    // 2) Leer body
-    const body = await req.json();
-    const cv = body.cv as string | undefined;
-    const jobDescription = body.jobDescription as string | undefined;
-    const countRaw = body.count as number | undefined;
-    const modeRaw = body.mode as string | undefined;
-    const languageRaw = body.language as string | undefined;
-    const userName = body.userName as string | undefined;
+    // 2) Leer body tipado
+    const body = (await req.json()) as GenerateLettersBody;
+    const cv = body.cv;
+    const jobDescription = body.jobDescription;
+    const countRaw = body.count;
+    const modeRaw = body.mode;
+    const languageRaw = body.language;
+    const userName = body.userName;
 
     if (!cv || !jobDescription) {
       return Response.json(
@@ -68,7 +82,6 @@ export async function POST(req: Request) {
     }
 
     // 💰 5) Lógica de créditos
-    // Por ahora: 1 crédito por carta generada
     const costPerLetter = 1;
     const totalCost = costPerLetter * count;
 
@@ -80,7 +93,7 @@ export async function POST(req: Request) {
           currentCredits: user.credits,
           requiredCredits: totalCost,
         },
-        { status: 402 } // Payment Required (semánticamente tiene sentido)
+        { status: 402 }
       );
     }
 
@@ -152,16 +165,18 @@ ${jobDescription}
       max_output_tokens: 2000,
     });
 
-    const firstOutput = response.output[0] as any;
-    const textItem = firstOutput.content.find(
-      (c: any) => c.type === "output_text"
+    // Evitamos `any`
+    const firstOutput = response.output[0] as OpenAIOutputItem | undefined;
+    const textItem = firstOutput?.content.find(
+      (c) => c.type === "output_text"
     );
     const rawText: string = textItem?.text ?? "";
 
-    let json: unknown;
+    // Parse seguro sin `any`
+    let parsed: unknown;
     try {
-      json = JSON.parse(rawText);
-    } catch (e) {
+      parsed = JSON.parse(rawText);
+    } catch {
       console.error("Error parseando JSON de OpenAI:", rawText);
       return Response.json(
         { error: "La respuesta del modelo no fue JSON válido" },
@@ -169,12 +184,14 @@ ${jobDescription}
       );
     }
 
-    const letters =
-      typeof json === "object" &&
-      json !== null &&
-      Array.isArray((json as any).letters)
-        ? (json as any).letters
-        : [];
+    let letters: string[] = [];
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      Array.isArray((parsed as { letters?: unknown }).letters)
+    ) {
+      letters = (parsed as { letters: string[] }).letters;
+    }
 
     // 8) Descontar créditos SOLO si realmente generamos cartas
     const newCredits = user.credits - totalCost;
@@ -191,7 +208,7 @@ ${jobDescription}
       remainingCredits: newCredits,
       spentCredits: totalCost,
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("OpenAI / API error:", err);
     return Response.json(
       { error: "Error interno al generar las cartas" },

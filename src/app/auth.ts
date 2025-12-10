@@ -4,6 +4,11 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./lib/prisma";
 
+type CredentialsForm = {
+  email?: string;
+  name?: string;
+};
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
@@ -16,23 +21,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         name: { label: "Name", type: "text" },
       },
-      async authorize(credentials) {
-        const email = credentials?.email;
-        const name = credentials?.name || "";
+      // 👇 OJO: no tipamos con CredentialsInput ni nada raro
+      async authorize(rawCredentials) {
+        const credentials = (rawCredentials ?? {}) as CredentialsForm;
 
-        if (!email) return null;
+        const email = credentials.email;
+        const name = credentials.name ?? "";
+
+        // Narrowing: a partir de aquí TS sabe que email es string
+        if (!email) {
+          return null;
+        }
 
         // Creamos o encontramos al usuario por email
         const user = await prisma.user.upsert({
-          where: { email },
+          where: { email },      // email: string ✅
           update: { name },
           create: {
             email,
             name,
-            // credits se inicializa con el default(10) del modelo
+            // credits usa el default(10) del modelo
           },
         });
 
+        // Devolver el usuario para NextAuth
         return user;
       },
     }),
