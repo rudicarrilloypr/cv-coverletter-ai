@@ -7,7 +7,6 @@ import { prisma } from "@/app/lib/prisma";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 // sin apiVersion
 
-
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
@@ -40,6 +39,9 @@ export async function POST(req: NextRequest) {
 
         const metadata = session.metadata || {};
 
+        // ID único de esta sesión de checkout (lo usamos para retry-safe)
+        const stripeId = session.id;
+
         // 👇 usamos las mismas keys que pusiste en create-checkout-session
         const email =
           (metadata.email as string | undefined) ||
@@ -48,29 +50,74 @@ export async function POST(req: NextRequest) {
           null;
 
         const creditsString = metadata.credits as string | undefined;
+        const packId = metadata.packId as string | undefined;
         const creditsToAdd = creditsString ? parseInt(creditsString, 10) : 0;
+
+        // Info de pago (amount_total viene en la unidad mínima, ej. centavos)
+        const amount =
+          typeof session.amount_total === "number" ? session.amount_total : 0;
+        const currency = session.currency || "usd";
 
         console.log("🎯 Webhook session.metadata:", metadata);
         console.log("🎯 email:", email, "creditsToAdd:", creditsToAdd);
+        console.log("🎯 stripeId:", stripeId, "amount:", amount, "currency:", currency);
 
-        if (!email || !creditsToAdd) {
+        if (!email || !creditsToAdd || !packId) {
           console.warn(
-            "No email or credits in metadata for checkout.session.completed"
+            "checkout.session.completed sin email, credits o packId en metadata. No se aplica."
           );
           break;
         }
 
-        await prisma.user.update({
+        // 1️⃣ Retry-safe: ¿ya procesamos este stripeId?
+        const existingPurchase = await prisma.purchase.findUnique({
+          where: { stripeId },
+        });
+
+        if (existingPurchase) {
+          console.log(
+            `⚠️ Webhook ya procesado para stripeId=${stripeId}, ignorando reintento.`
+          );
+          break;
+        }
+
+        // 2️⃣ Buscar usuario por email
+        const user = await prisma.user.findUnique({
           where: { email },
-          data: {
-            credits: {
-              increment: creditsToAdd,
+        });
+
+        if (!user) {
+          console.error(
+            `❌ Usuario no encontrado para email=${email}. No se aplican créditos.`
+          );
+          break;
+        }
+
+        // 3️⃣ Transacción: sumar créditos + registrar Purchase
+        await prisma.$transaction(async (tx) => {
+          await tx.user.update({
+            where: { id: user.id },
+            data: {
+              credits: {
+                increment: creditsToAdd,
+              },
             },
-          },
+          });
+
+          await tx.purchase.create({
+            data: {
+              userId: user.id,
+              stripeId,
+              packId,
+              credits: creditsToAdd,
+              amount,
+              currency,
+            },
+          });
         });
 
         console.log(
-          `✅ Añadidos ${creditsToAdd} créditos al usuario con email ${email}`
+          `✅ Añadidos ${creditsToAdd} créditos al usuario ${email} y registrada compra ${stripeId}`
         );
 
         break;

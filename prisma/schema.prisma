@@ -19,6 +19,9 @@ model User {
 
   accounts       Account[]
   sessions       Session[]
+
+  // 👉 Historial de compras de créditos
+  purchases      Purchase[]
 }
 
 model Account {
@@ -55,4 +58,25 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Purchase {
+  id        String   @id @default(cuid())
+
+  // Relación con el usuario que compró
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  // ID de Stripe (checkout session, payment intent, etc.)
+  stripeId  String   @unique
+
+  // Info del paquete
+  packId    String   // "starter", "pro", "ultimate"
+  credits   Int
+
+  // Monto pagado (en la unidad mínima, ej. centavos)
+  amount    Int
+  currency  String   // ej. "usd"
+
+  createdAt DateTime @default(now())
 }
