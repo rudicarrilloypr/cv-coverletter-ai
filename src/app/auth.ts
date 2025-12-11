@@ -1,52 +1,85 @@
-// src/auth.ts
+// src/app/auth.ts
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "./lib/prisma";
+import { prisma } from "@/app/lib/prisma";
+import bcrypt from "bcryptjs";
 
-type CredentialsForm = {
-  email?: string;
-  name?: string;
-};
+export const { auth, handlers, signIn, signOut } = NextAuth({
+  adapter: PrismaAdapter(prisma) as any,
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  // 👇 IMPORTANTE para Credentials
   session: {
     strategy: "jwt",
   },
+
   providers: [
     Credentials({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
-        name: { label: "Name", type: "text" },
+        email: {
+          label: "Email",
+          type: "email",
+        },
+        password: {
+          label: "Password",
+          type: "password",
+        },
       },
-      // 👇 OJO: no tipamos con CredentialsInput ni nada raro
-      async authorize(rawCredentials) {
-        const credentials = (rawCredentials ?? {}) as CredentialsForm;
-
-        const email = credentials.email;
-        const name = credentials.name ?? "";
-
-        // Narrowing: a partir de aquí TS sabe que email es string
-        if (!email) {
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
           return null;
         }
 
-        // Creamos o encontramos al usuario por email
-        const user = await prisma.user.upsert({
-          where: { email },      // email: string ✅
-          update: { name },
-          create: {
-            email,
-            name,
-            // credits usa el default(10) del modelo
-          },
+        // Buscar usuario por email
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
         });
 
-        // Devolver el usuario para NextAuth
-        return user;
+        // Si no existe o no tiene password guardado → null
+        if (!user || !user.password) {
+          return null;
+        }
+
+        // Comparar password plano vs hash
+        const isValid = await bcrypt.compare(
+          credentials.password,
+          user.password
+        );
+
+        if (!isValid) {
+          return null;
+        }
+
+        // Lo que retornes aquí se agrega al JWT
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        };
       },
     }),
   ],
+
+  // 👇 Para que `signIn("credentials")` use tu página de login
+  pages: {
+    signIn: "/login",
+  },
+
+  callbacks: {
+    async jwt({ token, user }) {
+      // Cuando el usuario hace login, 'user' viene definido 1 sola vez
+      if (user) {
+        token.userId = (user as any).id;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      // Pasamos el id al objeto session.user
+      if (token?.userId && session.user) {
+        (session.user as any).id = token.userId;
+      }
+      return session;
+    },
+  },
 });

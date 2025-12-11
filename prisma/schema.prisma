@@ -14,6 +14,9 @@ model User {
   emailVerified  DateTime?
   image          String?
 
+  // 👉 Password para login con credenciales
+  password       String?   // hash de la contraseña
+
   // 👉 Créditos para usar la app
   credits        Int      @default(10)
 
@@ -26,6 +29,7 @@ model User {
   // 👉 Cartas de presentación generadas
   coverLetters   CoverLetter[]
 }
+
 
 model Account {
   id                String  @id @default(cuid())

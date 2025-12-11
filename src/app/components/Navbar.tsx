@@ -103,7 +103,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between gap-3">
           {/* Logo / marca */}
           <Link
-            href="/"
+            href="/generate"
             className="flex items-center gap-2"
             onClick={closeMenu}
           >
@@ -172,13 +172,13 @@ export default function Navbar() {
                 !loadingMe && (
                   <>
                     <Link
-                      href="/api/auth/signin"
+                      href="/login"
                       className="rounded-lg border border-slate-700 px-3 py-1 font-medium text-slate-200 hover:bg-slate-900"
                     >
                       {t.login}
                     </Link>
                     <Link
-                      href="/api/auth/signin"
+                      href="/signup"
                       className="rounded-lg bg-emerald-500 px-3 py-1 font-medium text-slate-900 hover:bg-emerald-400"
                     >
                       {t.signup}
@@ -210,21 +210,19 @@ export default function Navbar() {
             )}
 
             {/* Botón burger */}
-<button
-  type="button"
-  onClick={() => setMenuOpen((prev) => !prev)}
-  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
-  aria-label={t.menu}
-  aria-expanded={menuOpen}
->
-  {/* Icono burger centrado */}
-  <div className="flex flex-col items-center justify-center gap-[3px]">
-    <span className="block h-[2px] w-4 rounded-full bg-slate-100" />
-    <span className="block h-[2px] w-4 rounded-full bg-slate-100" />
-    <span className="block h-[2px] w-4 rounded-full bg-slate-100" />
-  </div>
-</button>
-
+            <button
+              type="button"
+              onClick={() => setMenuOpen((prev) => !prev)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
+              aria-label={t.menu}
+              aria-expanded={menuOpen}
+            >
+              <div className="flex flex-col items-center justify-center gap-[3px]">
+                <span className="block h-[2px] w-4 rounded-full bg-slate-100" />
+                <span className="block h-[2px] w-4 rounded-full bg-slate-100" />
+                <span className="block h-[2px] w-4 rounded-full bg-slate-100" />
+              </div>
+            </button>
           </div>
         </div>
 
@@ -267,14 +265,14 @@ export default function Navbar() {
                 !loadingMe && (
                   <>
                     <Link
-                      href="/api/auth/signin"
+                      href="/login"
                       onClick={closeMenu}
                       className="inline-flex items-center justify-center rounded-lg border border-slate-700 px-3 py-1 font-medium text-slate-200 hover:bg-slate-900"
                     >
                       {t.login}
                     </Link>
                     <Link
-                      href="/api/auth/signin"
+                      href="/signup"
                       onClick={closeMenu}
                       className="inline-flex items-center justify-center rounded-lg bg-emerald-500 px-3 py-1 font-medium text-slate-900 hover:bg-emerald-400"
                     >
