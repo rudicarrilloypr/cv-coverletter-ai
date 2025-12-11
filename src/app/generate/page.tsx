@@ -40,6 +40,7 @@ const UI_TEXTS: Record<
     copied: string;
     pdfButton: string;
     uiLangLabel: string;
+    creditInfo: string; // 👈 NUEVO
   }
 > = {
   es: {
@@ -63,7 +64,7 @@ const UI_TEXTS: Record<
     letterLangLabel: "Idioma de la carta",
     letterLangAuto: "Detectar automáticamente (según la vacante)",
     letterLangSpanish: "Español",
-    letterLangEnglish: "Ingles",
+    letterLangEnglish: "Inglés",
     submitGenerating: "Generando...",
     submitGenerate: "Generar cartas",
     errorPrefix: "Error:",
@@ -74,6 +75,7 @@ const UI_TEXTS: Record<
     copied: "Copiada ✓",
     pdfButton: "PDF",
     uiLangLabel: "Idioma de la interfaz",
+    creditInfo: "1 crédito = 1 carta generada. Si pides 3 cartas, usarás 3 créditos.",
   },
   en: {
     pageTitle: "Cover Letter Generator",
@@ -107,6 +109,8 @@ const UI_TEXTS: Record<
     copied: "Copied ✓",
     pdfButton: "PDF",
     uiLangLabel: "Interface language",
+    creditInfo:
+      "1 credit = 1 generated cover letter. If you request 3 letters, you'll use 3 credits.",
   },
 };
 
@@ -353,6 +357,10 @@ export default function GeneratePage() {
                 onChange={(e) => setCount(Number(e.target.value))}
                 className="mt-1 w-24 md:w-full max-w-[120px] rounded-lg bg-slate-950 border border-slate-700 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
               />
+              {/* 👇 Leyenda de créditos */}
+              <p className="mt-1 text-[11px] text-slate-400">
+                {t.creditInfo}
+              </p>
             </div>
 
             {/* Estilo de carta */}
