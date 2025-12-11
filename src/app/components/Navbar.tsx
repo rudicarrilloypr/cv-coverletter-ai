@@ -28,7 +28,7 @@ const NAV_TEXTS = {
     menu: "Menú",
   },
   en: {
-    brand: "CoverLetter AI",
+    brand: "CoverLetter Generator",
     generate: "Generate",
     letters: "My letters",
     billing: "Billing & credits",
