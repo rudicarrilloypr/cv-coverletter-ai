@@ -22,6 +22,9 @@ model User {
 
   // 👉 Historial de compras de créditos
   purchases      Purchase[]
+
+  // 👉 Cartas de presentación generadas
+  coverLetters   CoverLetter[]
 }
 
 model Account {
@@ -79,4 +82,23 @@ model Purchase {
   currency  String   // ej. "usd"
 
   createdAt DateTime @default(now())
+}
+
+model CoverLetter {
+  id          String   @id @default(cuid())
+
+  // Relación con el usuario dueño de la carta
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+
+  // Info del trabajo
+  jobTitle    String
+  company     String
+  jobLink     String?   // opcional: link a la vacante
+  jobSummary  String?   // opcional: resumen / descripción del puesto
+
+  // Contenido de la carta generada
+  letter      String
+
+  createdAt   DateTime  @default(now())
 }

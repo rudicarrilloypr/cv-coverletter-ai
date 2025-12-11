@@ -3,10 +3,10 @@
 
 import React, { useState } from "react";
 import { jsPDF } from "jspdf";
+import { useUiLanguage, UiLanguage } from "../ui-language";
 
 type CoverLetterMode = "standard" | "concise" | "storytelling" | "technical";
 type CoverLetterLanguage = "auto" | "spanish" | "english";
-type UiLanguage = "es" | "en";
 
 const UI_TEXTS: Record<UiLanguage, {
   pageTitle: string;
@@ -114,74 +114,71 @@ export default function GeneratePage() {
   const [mode, setMode] = useState<CoverLetterMode>("standard");
   const [language, setLanguage] = useState<CoverLetterLanguage>("auto");
   const [userName, setUserName] = useState("");
-  const [uiLanguage, setUiLanguage] = useState<UiLanguage>("es"); // 👈 idioma de la interfaz
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [letters, setLetters] = useState<string[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
 
+  // 👇 idioma global, compartido con Navbar y otras páginas
+  const { uiLanguage, setUiLanguage } = useUiLanguage();
 
   const t = UI_TEXTS[uiLanguage];
 
-async function handleSubmit(e: React.FormEvent) {
-  e.preventDefault();
-  setError(null);
-  setLetters([]);
-  setLoading(true);
-  setCopiedIndex(null);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLetters([]);
+    setLoading(true);
+    setCopiedIndex(null);
 
-  try {
-    const res = await fetch("/api/generate-cover-letters", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        cv,
-        jobDescription,
-        count,
-        mode,
-        language,
-        userName,
-      }),
-    });
-
-    let data: any = null;
     try {
-      data = await res.json();
-    } catch {
-      // por si la respuesta no es JSON
+      const res = await fetch("/api/generate-cover-letters", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          cv,
+          jobDescription,
+          count,
+          mode,
+          language,
+          userName,
+        }),
+      });
+
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        // por si la respuesta no es JSON
+      }
+
+      if (!res.ok) {
+        const apiMessage =
+          data && typeof data.error === "string" ? data.error : null;
+        throw new Error(apiMessage || "Request failed");
+      }
+
+      const lettersFromApi = Array.isArray(data?.letters) ? data.letters : [];
+      setLetters(lettersFromApi);
+
+      // 👇 NUEVO: guardar créditos restantes si vienen de la API
+      if (typeof data?.remainingCredits === "number") {
+        setCredits(data.remainingCredits);
+      }
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Unexpected error";
+
+      setError(message);
+    } finally {
+      setLoading(false);
     }
-
-    if (!res.ok) {
-      const apiMessage =
-        data && typeof data.error === "string" ? data.error : null;
-      throw new Error(apiMessage || "Request failed");
-    }
-
-// dentro de handleSubmit, después de `data = await res.json();`
-
-const lettersFromApi = Array.isArray(data?.letters) ? data.letters : [];
-setLetters(lettersFromApi);
-
-// 👇 NUEVO: guardar créditos restantes si vienen de la API
-if (typeof data?.remainingCredits === "number") {
-  setCredits(data.remainingCredits);
-}
-
-  } catch (err: unknown) {
-    const message =
-      err && typeof err === "object" && "message" in err
-        ? String((err as { message?: string }).message)
-        : "Unexpected error";
-
-    setError(message);
-  } finally {
-    setLoading(false);
   }
-}
-
 
   async function handleCopy(letter: string, index: number) {
     try {
@@ -189,7 +186,6 @@ if (typeof data?.remainingCredits === "number") {
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
     } catch {
-      // deja el mensaje en español/inglés si quieres hacer un diccionario aparte
       setError("No se pudo copiar la carta al portapapeles.");
     }
   }
@@ -284,7 +280,7 @@ if (typeof data?.remainingCredits === "number") {
             <h1 className="text-2xl md:text-3xl font-semibold mb-2">
               {t.pageTitle}
             </h1>
-            <p className="text-sm text-slate-300 mb-2">{t.pageSubtitle}</p>
+          <p className="text-sm text-slate-300 mb-2">{t.pageSubtitle}</p>
           </div>
 
           <div className="flex flex-col items-end gap-1 text-xs">
@@ -406,21 +402,19 @@ if (typeof data?.remainingCredits === "number") {
             </div>
           </div>
 
-  <button
-  type="submit"
-  disabled={loading}
-  className="mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition"
->
-  {loading ? t.submitGenerating : t.submitGenerate}
-</button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            {loading ? t.submitGenerating : t.submitGenerate}
+          </button>
 
-{credits !== null && (
-  <p className="mt-2 text-xs text-slate-400">
-    Créditos restantes: <span className="font-semibold">{credits}</span>
-  </p>
-)}
-
-          
+          {credits !== null && (
+            <p className="mt-2 text-xs text-slate-400">
+              Créditos restantes: <span className="font-semibold">{credits}</span>
+            </p>
+          )}
         </form>
 
         {error && (

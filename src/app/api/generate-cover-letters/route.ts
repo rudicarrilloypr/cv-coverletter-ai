@@ -1,4 +1,3 @@
-// src/app/api/generate-cover-letters/route.ts
 import OpenAI from "openai";
 import { auth } from "@/app/auth";
 import { prisma } from "@/app/lib/prisma";
@@ -17,6 +16,12 @@ interface GenerateLettersBody {
   mode?: CoverLetterMode | string;
   language?: CoverLetterLanguage | string;
   userName?: string;
+
+  // Nuevo: info opcional del puesto para guardar en CoverLetter
+  jobTitle?: string;
+  company?: string;
+  jobLink?: string;
+  jobSummary?: string;
 }
 
 // Tipo mínimo que nos sirve para leer el output del modelo
@@ -46,6 +51,11 @@ export async function POST(req: Request) {
     const modeRaw = body.mode;
     const languageRaw = body.language;
     const userName = body.userName;
+
+    const jobTitle = body.jobTitle;
+    const company = body.company;
+    const jobLink = body.jobLink;
+    const jobSummary = body.jobSummary;
 
     if (!cv || !jobDescription) {
       return Response.json(
@@ -193,20 +203,57 @@ ${jobDescription}
       letters = (parsed as { letters: string[] }).letters;
     }
 
-    // 8) Descontar créditos SOLO si realmente generamos cartas
-    const newCredits = user.credits - totalCost;
+    if (!letters.length) {
+      return Response.json(
+        { error: "No se pudieron generar cartas válidas." },
+        { status: 500 }
+      );
+    }
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        credits: newCredits,
-      },
+    // Por seguridad: limitar a la cantidad solicitada
+    const lettersToSave = letters.slice(0, count);
+
+    // 8) Transacción: descontar créditos + guardar cartas en CoverLetter
+    const defaultJobTitle = jobTitle || "Puesto no especificado";
+    const defaultCompany = company || "Empresa no especificada";
+    const finalJobSummary = jobSummary ?? null;
+    const finalJobLink = jobLink ?? null;
+
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      // Descontar créditos de forma atómica
+      const updated = await tx.user.update({
+        where: { id: user.id },
+        data: {
+          credits: {
+            decrement: lettersToSave.length * costPerLetter,
+          },
+        },
+      });
+
+      // Guardar cada carta como CoverLetter
+      await tx.coverLetter.createMany({
+        data: lettersToSave.map((letter) => ({
+          userId: user.id,
+          jobTitle: defaultJobTitle,
+          company: defaultCompany,
+          jobLink: finalJobLink,
+          jobSummary: finalJobSummary,
+          letter,
+        })),
+      });
+
+      return updated;
     });
+
+    const remainingCredits = updatedUser.credits;
+    const spentCredits = lettersToSave.length * costPerLetter;
 
     return Response.json({
       letters,
-      remainingCredits: newCredits,
-      spentCredits: totalCost,
+      remainingCredits,
+      spentCredits,
+      // opcional: podrías usar esto luego en la UI si quieres
+      countSaved: lettersToSave.length,
     });
   } catch (err: unknown) {
     console.error("OpenAI / API error:", err);
