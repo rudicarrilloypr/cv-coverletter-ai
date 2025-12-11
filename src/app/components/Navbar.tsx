@@ -23,7 +23,7 @@ const NAV_TEXTS = {
     login: "Iniciar sesión",
     signup: "Crear cuenta",
     logout: "Cerrar sesión",
-    hello: "Hola",
+    hello: "usuario",
     creditsLabel: "Créditos",
   },
   en: {
@@ -34,7 +34,7 @@ const NAV_TEXTS = {
     login: "Log in",
     signup: "Sign up",
     logout: "Log out",
-    hello: "Hi",
+    hello: "user",
     creditsLabel: "Credits",
   },
 } as const;
