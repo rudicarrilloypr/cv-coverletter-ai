@@ -97,8 +97,8 @@ const CREDIT_PACKS_UI: {
     name: { es: "Starter", en: "Starter" },
     credits: 10,
     priceLabel: {
-      es: "$5 USD (ejemplo)",
-      en: "$5 USD (example)",
+      es: "$5 USD",
+      en: "$5 USD",
     },
   },
   {
@@ -106,8 +106,8 @@ const CREDIT_PACKS_UI: {
     name: { es: "Pro", en: "Pro" },
     credits: 30,
     priceLabel: {
-      es: "$12 USD (ejemplo)",
-      en: "$12 USD (example)",
+      es: "$12 USD",
+      en: "$12 USD",
     },
     highlight: true,
   },
@@ -116,8 +116,8 @@ const CREDIT_PACKS_UI: {
     name: { es: "Ultimate", en: "Ultimate" },
     credits: 80,
     priceLabel: {
-      es: "$25 USD (ejemplo)",
-      en: "$25 USD (example)",
+      es: "$25 USD",
+      en: "$25 USD",
     },
   },
 ];
