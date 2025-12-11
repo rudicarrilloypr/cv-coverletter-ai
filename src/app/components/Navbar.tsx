@@ -6,7 +6,7 @@ import { useUiLanguage } from "../ui-language";
 
 const NAV_TEXTS = {
   es: {
-    brand: "CoverLetter AI",
+    brand: "CoverLetter Generator",
     generate: "Generar",
     letters: "Mis cartas",
     billing: "Billing & créditos",

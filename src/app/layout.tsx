@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CoverLetter AI",
+  title: "CoverLetter Gen",
   description:
     "Genera cartas de presentación personalizadas usando IA, tu CV y la descripción del puesto.",
 };
