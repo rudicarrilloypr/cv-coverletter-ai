@@ -1,43 +1,48 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState } from "react";
 import { jsPDF } from "jspdf";
+import { useUiLanguage, UiLanguage } from "../ui-language";
 
 type CoverLetterMode = "standard" | "concise" | "storytelling" | "technical";
 type CoverLetterLanguage = "auto" | "spanish" | "english";
-type UiLanguage = "es" | "en";
 
-const UI_TEXTS: Record<UiLanguage, {
-  pageTitle: string;
-  pageSubtitle: string;
-  userNameLabel: string;
-  userNamePlaceholder: string;
-  userNameHelper: string;
-  cvLabel: string;
-  cvPlaceholder: string;
-  jdLabel: string;
-  jdPlaceholder: string;
-  countLabel: string;
-  modeLabel: string;
-  modeOptionStandard: string;
-  modeOptionConcise: string;
-  modeOptionStorytelling: string;
-  modeOptionTechnical: string;
-  letterLangLabel: string;
-  letterLangAuto: string;
-  letterLangSpanish: string;
-  letterLangEnglish: string;
-  submitGenerating: string;
-  submitGenerate: string;
-  errorPrefix: string;
-  generatedTitle: string;
-  downloadAll: string;
-  letterIndexLabel: (i: number) => string;
-  copy: string;
-  copied: string;
-  pdfButton: string;
-  uiLangLabel: string;
-}> = {
+const UI_TEXTS: Record<
+  UiLanguage,
+  {
+    pageTitle: string;
+    pageSubtitle: string;
+    userNameLabel: string;
+    userNamePlaceholder: string;
+    userNameHelper: string;
+    cvLabel: string;
+    cvPlaceholder: string;
+    jdLabel: string;
+    jdPlaceholder: string;
+    countLabel: string;
+    modeLabel: string;
+    modeOptionStandard: string;
+    modeOptionConcise: string;
+    modeOptionStorytelling: string;
+    modeOptionTechnical: string;
+    letterLangLabel: string;
+    letterLangAuto: string;
+    letterLangSpanish: string;
+    letterLangEnglish: string;
+    submitGenerating: string;
+    submitGenerate: string;
+    errorPrefix: string;
+    generatedTitle: string;
+    downloadAll: string;
+    letterIndexLabel: (i: number) => string;
+    copy: string;
+    copied: string;
+    pdfButton: string;
+    uiLangLabel: string;
+    creditInfo: string; // 👈 NUEVO
+  }
+> = {
   es: {
     pageTitle: "Generador de Cartas de Presentación",
     pageSubtitle:
@@ -49,7 +54,7 @@ const UI_TEXTS: Record<UiLanguage, {
     cvLabel: "Tu CV",
     cvPlaceholder: "Pega aquí tu CV en texto...",
     jdLabel: "Descripción del puesto",
-    jdPlaceholder: "Pega aquí la job description...",
+    jdPlaceholder: "Pega aquí la descripción del empleo...",
     countLabel: "Número de cartas a generar",
     modeLabel: "Estilo de carta",
     modeOptionStandard: "Profesional balanceada (recomendada)",
@@ -59,7 +64,7 @@ const UI_TEXTS: Record<UiLanguage, {
     letterLangLabel: "Idioma de la carta",
     letterLangAuto: "Detectar automáticamente (según la vacante)",
     letterLangSpanish: "Español",
-    letterLangEnglish: "Ingles",
+    letterLangEnglish: "Inglés",
     submitGenerating: "Generando...",
     submitGenerate: "Generar cartas",
     errorPrefix: "Error:",
@@ -70,6 +75,7 @@ const UI_TEXTS: Record<UiLanguage, {
     copied: "Copiada ✓",
     pdfButton: "PDF",
     uiLangLabel: "Idioma de la interfaz",
+    creditInfo: "1 crédito = 1 carta generada. Si pides 3 cartas, usarás 3 créditos.",
   },
   en: {
     pageTitle: "Cover Letter Generator",
@@ -103,6 +109,8 @@ const UI_TEXTS: Record<UiLanguage, {
     copied: "Copied ✓",
     pdfButton: "PDF",
     uiLangLabel: "Interface language",
+    creditInfo:
+      "1 credit = 1 generated cover letter. If you request 3 letters, you'll use 3 credits.",
   },
 };
 
@@ -113,12 +121,13 @@ export default function GeneratePage() {
   const [mode, setMode] = useState<CoverLetterMode>("standard");
   const [language, setLanguage] = useState<CoverLetterLanguage>("auto");
   const [userName, setUserName] = useState("");
-  const [uiLanguage, setUiLanguage] = useState<UiLanguage>("es"); // 👈 idioma de la interfaz
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [letters, setLetters] = useState<string[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [credits, setCredits] = useState<number | null>(null);
 
+  const { uiLanguage, setUiLanguage } = useUiLanguage();
   const t = UI_TEXTS[uiLanguage];
 
   async function handleSubmit(e: React.FormEvent) {
@@ -144,13 +153,25 @@ export default function GeneratePage() {
         }),
       });
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Request failed");
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        // por si la respuesta no es JSON
       }
 
-      const data = await res.json();
-      setLetters(data.letters || []);
+      if (!res.ok) {
+        const apiMessage =
+          data && typeof data.error === "string" ? data.error : null;
+        throw new Error(apiMessage || "Request failed");
+      }
+
+      const lettersFromApi = Array.isArray(data?.letters) ? data.letters : [];
+      setLetters(lettersFromApi);
+
+      if (typeof data?.remainingCredits === "number") {
+        setCredits(data.remainingCredits);
+      }
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "message" in err
@@ -169,7 +190,6 @@ export default function GeneratePage() {
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
     } catch {
-      // deja el mensaje en español/inglés si quieres hacer un diccionario aparte
       setError("No se pudo copiar la carta al portapapeles.");
     }
   }
@@ -259,7 +279,7 @@ export default function GeneratePage() {
     <main className="min-h-screen flex justify-center px-4 py-10 bg-slate-950">
       <div className="w-full max-w-3xl bg-slate-900 text-slate-50 rounded-2xl p-6 md:p-8 shadow-lg border border-slate-800">
         {/* Header con selector de idioma de interfaz */}
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-semibold mb-2">
               {t.pageTitle}
@@ -267,7 +287,7 @@ export default function GeneratePage() {
             <p className="text-sm text-slate-300 mb-2">{t.pageSubtitle}</p>
           </div>
 
-          <div className="flex flex-col items-end gap-1 text-xs">
+          <div className="flex flex-row md:flex-col items-center md:items-end gap-2 text-xs">
             <label className="font-medium">{t.uiLangLabel}</label>
             <select
               value={uiLanguage}
@@ -322,10 +342,11 @@ export default function GeneratePage() {
             />
           </div>
 
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          {/* Controles de número / estilo / idioma en grid responsivo */}
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {/* Número de cartas */}
-            <div className="flex items-center gap-3">
-              <label className="text-sm font-medium">
+            <div className="rounded-xl bg-slate-950/60 border border-slate-700 px-3 py-3 flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-200">
                 {t.countLabel}
               </label>
               <input
@@ -334,36 +355,36 @@ export default function GeneratePage() {
                 max={10}
                 value={count}
                 onChange={(e) => setCount(Number(e.target.value))}
-                className="w-20 rounded-lg bg-slate-950 border border-slate-700 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                className="mt-1 w-24 md:w-full max-w-[120px] rounded-lg bg-slate-950 border border-slate-700 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
               />
+              {/* 👇 Leyenda de créditos */}
+              <p className="mt-1 text-[11px] text-slate-400">
+                {t.creditInfo}
+              </p>
             </div>
 
             {/* Estilo de carta */}
-            <div className="flex items-center gap-3">
-              <label className="text-sm font-medium">{t.modeLabel}</label>
+            <div className="rounded-xl bg-slate-950/60 border border-slate-700 px-3 py-3 flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-200">
+                {t.modeLabel}
+              </label>
               <select
                 value={mode}
                 onChange={(e) => setMode(e.target.value as CoverLetterMode)}
-                className="rounded-lg bg-slate-950 border border-slate-700 px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-xs md:text-sm outline-none focus:ring-2 focus:ring-emerald-500"
               >
-                <option value="standard">
-                  {t.modeOptionStandard}
-                </option>
-                <option value="concise">
-                  {t.modeOptionConcise}
-                </option>
+                <option value="standard">{t.modeOptionStandard}</option>
+                <option value="concise">{t.modeOptionConcise}</option>
                 <option value="storytelling">
                   {t.modeOptionStorytelling}
                 </option>
-                <option value="technical">
-                  {t.modeOptionTechnical}
-                </option>
+                <option value="technical">{t.modeOptionTechnical}</option>
               </select>
             </div>
 
             {/* Idioma de la carta */}
-            <div className="flex items-center gap-3">
-              <label className="text-sm font-medium">
+            <div className="rounded-xl bg-slate-950/60 border border-slate-700 px-3 py-3 flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-200">
                 {t.letterLangLabel}
               </label>
               <select
@@ -371,17 +392,11 @@ export default function GeneratePage() {
                 onChange={(e) =>
                   setLanguage(e.target.value as CoverLetterLanguage)
                 }
-                className="rounded-lg bg-slate-950 border border-slate-700 px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                className="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-xs md:text-sm outline-none focus:ring-2 focus:ring-emerald-500"
               >
-                <option value="auto">
-                  {t.letterLangAuto}
-                </option>
-                <option value="spanish">
-                  {t.letterLangSpanish}
-                </option>
-                <option value="english">
-                  {t.letterLangEnglish}
-                </option>
+                <option value="auto">{t.letterLangAuto}</option>
+                <option value="spanish">{t.letterLangSpanish}</option>
+                <option value="english">{t.letterLangEnglish}</option>
               </select>
             </div>
           </div>
@@ -393,6 +408,13 @@ export default function GeneratePage() {
           >
             {loading ? t.submitGenerating : t.submitGenerate}
           </button>
+
+          {credits !== null && (
+            <p className="mt-2 text-xs text-slate-400">
+              Créditos restantes:{" "}
+              <span className="font-semibold">{credits}</span>
+            </p>
+          )}
         </form>
 
         {error && (
@@ -403,13 +425,13 @@ export default function GeneratePage() {
 
         {letters.length > 0 && (
           <section className="mt-6 space-y-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
               <h2 className="text-lg font-semibold">{t.generatedTitle}</h2>
 
               <button
                 type="button"
                 onClick={downloadAllPdf}
-                className="text-xs px-3 py-1 rounded-lg border border-emerald-500 text-emerald-400 hover:bg-emerald-500/10 transition"
+                className="self-start sm:self-auto text-xs px-3 py-1 rounded-lg border border-emerald-500 text-emerald-400 hover:bg-emerald-500/10 transition"
               >
                 {t.downloadAll}
               </button>
@@ -420,7 +442,7 @@ export default function GeneratePage() {
                 key={idx}
                 className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm whitespace-pre-line"
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                   <div className="text-xs text-slate-400">
                     {t.letterIndexLabel(idx + 1)}
                   </div>

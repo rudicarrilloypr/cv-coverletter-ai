@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String?
+  email          String?  @unique
+  emailVerified  DateTime?
+  image          String?
+
+  // 👉 Password para login con credenciales
+  password       String?   // hash de la contraseña
+
+  // 👉 Créditos para usar la app
+  credits        Int      @default(10)
+
+  accounts       Account[]
+  sessions       Session[]
+
+  // 👉 Historial de compras de créditos
+  purchases      Purchase[]
+
+  // 👉 Cartas de presentación generadas
+  coverLetters   CoverLetter[]
+}
+
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Purchase {
+  id        String   @id @default(cuid())
+
+  // Relación con el usuario que compró
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  // ID de Stripe (checkout session, payment intent, etc.)
+  stripeId  String   @unique
+
+  // Info del paquete
+  packId    String   // "starter", "pro", "ultimate"
+  credits   Int
+
+  // Monto pagado (en la unidad mínima, ej. centavos)
+  amount    Int
+  currency  String   // ej. "usd"
+
+  createdAt DateTime @default(now())
+}
+
+model CoverLetter {
+  id          String   @id @default(cuid())
+
+  // Relación con el usuario dueño de la carta
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+
+  // Info del trabajo
+  jobTitle    String
+  company     String
+  jobLink     String?   // opcional: link a la vacante
+  jobSummary  String?   // opcional: resumen / descripción del puesto
+
+  // Contenido de la carta generada
+  letter      String
+
+  createdAt   DateTime  @default(now())
+}

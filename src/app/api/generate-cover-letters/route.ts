@@ -1,4 +1,6 @@
 import OpenAI from "openai";
+import { auth } from "@/app/auth";
+import { prisma } from "@/app/lib/prisma";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -7,15 +9,53 @@ const openai = new OpenAI({
 type CoverLetterMode = "standard" | "concise" | "storytelling" | "technical";
 type CoverLetterLanguage = "auto" | "spanish" | "english";
 
+interface GenerateLettersBody {
+  cv?: string;
+  jobDescription?: string;
+  count?: number;
+  mode?: CoverLetterMode | string;
+  language?: CoverLetterLanguage | string;
+  userName?: string;
+
+  // Nuevo: info opcional del puesto para guardar en CoverLetter
+  jobTitle?: string;
+  company?: string;
+  jobLink?: string;
+  jobSummary?: string;
+}
+
+// Tipo mínimo que nos sirve para leer el output del modelo
+type OpenAIOutputItem = {
+  content: { type: string; text?: string }[];
+};
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const cv = body.cv as string | undefined;
-    const jobDescription = body.jobDescription as string | undefined;
-    const countRaw = body.count as number | undefined;
-    const modeRaw = body.mode as string | undefined;
-    const languageRaw = body.language as string | undefined;
-    const userName = body.userName as string | undefined; // 👈 nombre
+    // 1) Verificar sesión
+    const session = await auth();
+
+    if (!session || !session.user || !session.user.email) {
+      return Response.json(
+        { error: "Debes iniciar sesión para generar cartas." },
+        { status: 401 }
+      );
+    }
+
+    const email = session.user.email;
+
+    // 2) Leer body tipado
+    const body = (await req.json()) as GenerateLettersBody;
+    const cv = body.cv;
+    const jobDescription = body.jobDescription;
+    const countRaw = body.count;
+    const modeRaw = body.mode;
+    const languageRaw = body.language;
+    const userName = body.userName;
+
+    const jobTitle = body.jobTitle;
+    const company = body.company;
+    const jobLink = body.jobLink;
+    const jobSummary = body.jobSummary;
 
     if (!cv || !jobDescription) {
       return Response.json(
@@ -24,6 +64,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // 3) Normalizar parámetros
     const count = Math.min(Math.max(Number(countRaw) || 3, 1), 10);
 
     const mode: CoverLetterMode =
@@ -38,6 +79,35 @@ export async function POST(req: Request) {
         ? languageRaw
         : "auto";
 
+    // 4) Buscar usuario en DB
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return Response.json(
+        { error: "Usuario no encontrado en la base de datos." },
+        { status: 404 }
+      );
+    }
+
+    // 💰 5) Lógica de créditos
+    const costPerLetter = 1;
+    const totalCost = costPerLetter * count;
+
+    if (user.credits < totalCost) {
+      return Response.json(
+        {
+          error:
+            "No tienes créditos suficientes para generar estas cartas. Compra más créditos o reduce la cantidad.",
+          currentCredits: user.credits,
+          requiredCredits: totalCost,
+        },
+        { status: 402 }
+      );
+    }
+
+    // 6) Instrucciones de modo / idioma / firma
     const modeInstructions =
       mode === "concise"
         ? "Haz cada carta muy breve y directa, máximo 3 párrafos, y ve al punto rápidamente."
@@ -98,22 +168,25 @@ DESCRIPCIÓN DEL PUESTO:
 ${jobDescription}
     `.trim();
 
+    // 7) Llamar a OpenAI SOLO si hay créditos suficientes
     const response = await openai.responses.create({
       model: "gpt-4.1-mini",
       input: prompt,
       max_output_tokens: 2000,
     });
 
-    const firstOutput = response.output[0] as any;
-    const textItem = firstOutput.content.find(
-      (c: any) => c.type === "output_text"
+    // Evitamos `any`
+    const firstOutput = response.output[0] as OpenAIOutputItem | undefined;
+    const textItem = firstOutput?.content.find(
+      (c) => c.type === "output_text"
     );
     const rawText: string = textItem?.text ?? "";
 
-    let json: unknown;
+    // Parse seguro sin `any`
+    let parsed: unknown;
     try {
-      json = JSON.parse(rawText);
-    } catch (e) {
+      parsed = JSON.parse(rawText);
+    } catch {
       console.error("Error parseando JSON de OpenAI:", rawText);
       return Response.json(
         { error: "La respuesta del modelo no fue JSON válido" },
@@ -121,16 +194,72 @@ ${jobDescription}
       );
     }
 
-    const letters =
-      typeof json === "object" &&
-      json !== null &&
-      Array.isArray((json as any).letters)
-        ? (json as any).letters
-        : [];
+    let letters: string[] = [];
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      Array.isArray((parsed as { letters?: unknown }).letters)
+    ) {
+      letters = (parsed as { letters: string[] }).letters;
+    }
 
-    return Response.json({ letters });
-  } catch (err) {
-    console.error("OpenAI error:", err);
-    return Response.json({ error: "Error calling OpenAI" }, { status: 500 });
+    if (!letters.length) {
+      return Response.json(
+        { error: "No se pudieron generar cartas válidas." },
+        { status: 500 }
+      );
+    }
+
+    // Por seguridad: limitar a la cantidad solicitada
+    const lettersToSave = letters.slice(0, count);
+
+    // 8) Transacción: descontar créditos + guardar cartas en CoverLetter
+    const defaultJobTitle = jobTitle || "Puesto no especificado";
+    const defaultCompany = company || "Empresa no especificada";
+    const finalJobSummary = jobSummary ?? null;
+    const finalJobLink = jobLink ?? null;
+
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      // Descontar créditos de forma atómica
+      const updated = await tx.user.update({
+        where: { id: user.id },
+        data: {
+          credits: {
+            decrement: lettersToSave.length * costPerLetter,
+          },
+        },
+      });
+
+      // Guardar cada carta como CoverLetter
+      await tx.coverLetter.createMany({
+        data: lettersToSave.map((letter) => ({
+          userId: user.id,
+          jobTitle: defaultJobTitle,
+          company: defaultCompany,
+          jobLink: finalJobLink,
+          jobSummary: finalJobSummary,
+          letter,
+        })),
+      });
+
+      return updated;
+    });
+
+    const remainingCredits = updatedUser.credits;
+    const spentCredits = lettersToSave.length * costPerLetter;
+
+    return Response.json({
+      letters,
+      remainingCredits,
+      spentCredits,
+      // opcional: podrías usar esto luego en la UI si quieres
+      countSaved: lettersToSave.length,
+    });
+  } catch (err: unknown) {
+    console.error("OpenAI / API error:", err);
+    return Response.json(
+      { error: "Error interno al generar las cartas" },
+      { status: 500 }
+    );
   }
 }
