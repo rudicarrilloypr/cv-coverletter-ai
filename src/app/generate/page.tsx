@@ -53,7 +53,7 @@ const UI_TEXTS: Record<
     cvLabel: "Tu CV",
     cvPlaceholder: "Pega aquí tu CV en texto...",
     jdLabel: "Descripción del puesto",
-    jdPlaceholder: "Pega aquí la job description...",
+    jdPlaceholder: "Pega aquí la descripción del empleo...",
     countLabel: "Número de cartas a generar",
     modeLabel: "Estilo de carta",
     modeOptionStandard: "Profesional balanceada (recomendada)",
