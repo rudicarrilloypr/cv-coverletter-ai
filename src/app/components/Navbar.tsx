@@ -43,7 +43,7 @@ const NAV_TEXTS = {
 
 export default function Navbar() {
   const pathname = usePathname();
-  const { uiLanguage } = useUiLanguage();
+  const { uiLanguage, setUiLanguage } = useUiLanguage();
   const t = NAV_TEXTS[uiLanguage];
 
   const NAV_ITEMS = [
@@ -96,6 +96,33 @@ export default function Navbar() {
     setMenuOpen(false);
   }
 
+  const LanguageToggle = (
+    <div className="flex items-center gap-1 text-[11px]">
+      <button
+        type="button"
+        onClick={() => setUiLanguage("es")}
+        className={`px-2 py-1 rounded-full border transition ${
+          uiLanguage === "es"
+            ? "bg-emerald-500 text-slate-900 border-emerald-500"
+            : "bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800"
+        }`}
+      >
+        ES
+      </button>
+      <button
+        type="button"
+        onClick={() => setUiLanguage("en")}
+        className={`px-2 py-1 rounded-full border transition ${
+          uiLanguage === "en"
+            ? "bg-emerald-500 text-slate-900 border-emerald-500"
+            : "bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800"
+        }`}
+      >
+        EN
+      </button>
+    </div>
+  );
+
   return (
     <nav className="w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-sm">
       <div className="mx-auto max-w-5xl px-4 py-3">
@@ -115,7 +142,7 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* DESKTOP: nav + usuario */}
+          {/* DESKTOP: nav + idioma + usuario */}
           <div className="hidden md:flex flex-1 items-center justify-end gap-4">
             {/* Links de navegación */}
             <div className="flex items-center gap-2 text-sm">
@@ -137,6 +164,9 @@ export default function Navbar() {
                 );
               })}
             </div>
+
+            {/* Toggle de idioma */}
+            {LanguageToggle}
 
             {/* Panel de usuario / auth */}
             <div className="flex items-center gap-3 text-xs">
@@ -189,8 +219,11 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* MOBILE: créditos + usuario + burger */}
+          {/* MOBILE: idioma + créditos + usuario + burger */}
           <div className="flex flex-1 items-center justify-end gap-2 md:hidden">
+            {/* Idioma en mobile */}
+            {LanguageToggle}
+
             {isAuthed && typeof userCredits === "number" && (
               <div className="rounded-full border border-emerald-500/60 bg-emerald-500/10 px-3 py-1 text-[11px] font-medium text-emerald-300">
                 {t.creditsLabel}:{" "}
