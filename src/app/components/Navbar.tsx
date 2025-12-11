@@ -56,34 +56,6 @@ export default function Navbar() {
   const [loadingMe, setLoadingMe] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadMe() {
-      try {
-        const res = await fetch("/api/me", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as MeResponse;
-        if (!cancelled) {
-          setMe(data);
-        }
-      } catch {
-        if (!cancelled) {
-          setMe({ authenticated: false });
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingMe(false);
-        }
-      }
-    }
-
-    loadMe();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const isAuthed = me?.authenticated === true;
   const userName =
     isAuthed && "name" in (me || {})
@@ -122,6 +94,39 @@ export default function Navbar() {
       </button>
     </div>
   );
+
+  // 🔁 IMPORTANTE: recargar /api/me cada vez que cambie la ruta
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMe() {
+      try {
+        setLoadingMe(true);
+        const res = await fetch("/api/me", { cache: "no-store" });
+        if (!res.ok) {
+          if (!cancelled) setMe({ authenticated: false });
+          return;
+        }
+        const data = (await res.json()) as MeResponse;
+        if (!cancelled) {
+          setMe(data);
+        }
+      } catch {
+        if (!cancelled) {
+          setMe({ authenticated: false });
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingMe(false);
+        }
+      }
+    }
+
+    loadMe();
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]); // 👈 antes estaba []
 
   return (
     <nav className="w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-sm">
