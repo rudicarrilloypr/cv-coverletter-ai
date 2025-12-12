@@ -18,7 +18,7 @@ model User {
   password       String?   // hash de la contraseña
 
   // 👉 Créditos para usar la app
-  credits        Int      @default(10)
+  credits        Int      @default(5)
 
   accounts       Account[]
   sessions       Session[]
