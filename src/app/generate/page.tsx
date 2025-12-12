@@ -20,6 +20,13 @@ const UI_TEXTS: Record<
     cvPlaceholder: string;
     jdLabel: string;
     jdPlaceholder: string;
+
+    // 👇 NUEVO: puesto y empresa
+    jobTitleLabel: string;
+    jobTitlePlaceholder: string;
+    companyLabel: string;
+    companyPlaceholder: string;
+
     countLabel: string;
     modeLabel: string;
     modeOptionStandard: string;
@@ -40,7 +47,7 @@ const UI_TEXTS: Record<
     copied: string;
     pdfButton: string;
     uiLangLabel: string;
-    creditInfo: string; // 👈 NUEVO
+    creditInfo: string;
   }
 > = {
   es: {
@@ -55,6 +62,12 @@ const UI_TEXTS: Record<
     cvPlaceholder: "Pega aquí tu CV en texto...",
     jdLabel: "Descripción del puesto",
     jdPlaceholder: "Pega aquí la descripción del empleo...",
+
+    jobTitleLabel: "Puesto / rol",
+    jobTitlePlaceholder: "Ej. Frontend Developer",
+    companyLabel: "Empresa",
+    companyPlaceholder: "Ej. OpenAI",
+
     countLabel: "Número de cartas a generar",
     modeLabel: "Estilo de carta",
     modeOptionStandard: "Profesional balanceada (recomendada)",
@@ -75,7 +88,8 @@ const UI_TEXTS: Record<
     copied: "Copiada ✓",
     pdfButton: "PDF",
     uiLangLabel: "Idioma de la interfaz",
-    creditInfo: "1 crédito = 1 carta generada. Si pides 3 cartas, usarás 3 créditos.",
+    creditInfo:
+      "1 crédito = 1 carta generada. Si pides 3 cartas, usarás 3 créditos.",
   },
   en: {
     pageTitle: "Cover Letter Generator",
@@ -89,6 +103,12 @@ const UI_TEXTS: Record<
     cvPlaceholder: "Paste your CV text here...",
     jdLabel: "Job description",
     jdPlaceholder: "Paste the job description here...",
+
+    jobTitleLabel: "Job title / role",
+    jobTitlePlaceholder: "e.g. Frontend Developer",
+    companyLabel: "Company",
+    companyPlaceholder: "e.g. OpenAI",
+
     countLabel: "Number of cover letters to generate",
     modeLabel: "Cover letter style",
     modeOptionStandard: "Balanced professional (recommended)",
@@ -117,6 +137,11 @@ const UI_TEXTS: Record<
 export default function GeneratePage() {
   const [cv, setCv] = useState("");
   const [jobDescription, setJobDescription] = useState("");
+
+  // 👇 NUEVO estado
+  const [jobTitle, setJobTitle] = useState("");
+  const [company, setCompany] = useState("");
+
   const [count, setCount] = useState(3);
   const [mode, setMode] = useState<CoverLetterMode>("standard");
   const [language, setLanguage] = useState<CoverLetterLanguage>("auto");
@@ -150,6 +175,9 @@ export default function GeneratePage() {
           mode,
           language,
           userName,
+          // 👇 Mandamos puesto y empresa al API
+          jobTitle,
+          company,
         }),
       });
 
@@ -342,6 +370,34 @@ export default function GeneratePage() {
             />
           </div>
 
+          {/* 👇 NUEVO: puesto y empresa en grid responsivo */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="block text-sm mb-1 font-medium">
+                {t.jobTitleLabel}
+              </label>
+              <input
+                type="text"
+                className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder={t.jobTitlePlaceholder}
+              />
+            </div>
+            <div>
+              <label className="block text-sm mb-1 font-medium">
+                {t.companyLabel}
+              </label>
+              <input
+                type="text"
+                className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder={t.companyPlaceholder}
+              />
+            </div>
+          </div>
+
           {/* Controles de número / estilo / idioma en grid responsivo */}
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {/* Número de cartas */}
@@ -357,7 +413,6 @@ export default function GeneratePage() {
                 onChange={(e) => setCount(Number(e.target.value))}
                 className="mt-1 w-24 md:w-full max-w-[120px] rounded-lg bg-slate-950 border border-slate-700 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
               />
-              {/* 👇 Leyenda de créditos */}
               <p className="mt-1 text-[11px] text-slate-400">
                 {t.creditInfo}
               </p>
