@@ -1,4 +1,3 @@
-// src/app/login/page.tsx
 "use client";
 
 import { FormEvent, useState } from "react";
@@ -46,7 +45,7 @@ const LOGIN_TEXTS: Record<
 };
 
 export default function LoginPage() {
-  const { uiLanguage } = useUiLanguage();
+  const { uiLanguage, setUiLanguage } = useUiLanguage();
   const t = LOGIN_TEXTS[uiLanguage];
 
   const [email, setEmail] = useState("");
@@ -77,69 +76,112 @@ export default function LoginPage() {
       return;
     }
 
-    // login ok → redirigir
     router.push(res.url || callbackUrl);
   }
 
   return (
     <main className="min-h-screen flex justify-center items-center px-4 bg-slate-950">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-lg">
-        <h1 className="text-2xl md:text-3xl font-semibold mb-2">
-          {t.title}
-        </h1>
-        <p className="text-sm text-slate-300 mb-6">{t.subtitle}</p>
+      <div className="w-full max-w-md">
+        <div className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-lg">
+          {/* Header con logo + switch idioma */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/60 flex items-center justify-center">
+                <span className="text-sm font-bold tracking-wide text-emerald-300">
+                  CL
+                </span>
+              </div>
+              <div>
+                <h1 className="text-xl md:text-2xl font-semibold mb-1">
+                  {t.title}
+                </h1>
+                <p className="text-xs text-slate-400 max-w-xs">
+                  {t.subtitle}
+                </p>
+              </div>
+            </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm mb-1 font-medium">
-              {t.emailLabel}
-            </label>
-            <input
-              type="email"
-              required
-              className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+            <div className="flex flex-col items-end gap-1 text-[11px]">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setUiLanguage("es")}
+                  className={`px-2 py-1 rounded-full border ${
+                    uiLanguage === "es"
+                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-300"
+                      : "border-slate-700 text-slate-400 hover:bg-slate-800"
+                  }`}
+                >
+                  ES
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUiLanguage("en")}
+                  className={`px-2 py-1 rounded-full border ${
+                    uiLanguage === "en"
+                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-300"
+                      : "border-slate-700 text-slate-400 hover:bg-slate-800"
+                  }`}
+                >
+                  EN
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm mb-1 font-medium">
-              {t.passwordLabel}
-            </label>
-            <input
-              type="password"
-              required
-              className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
+          {/* Formulario */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm mb-1 font-medium">
+                {t.emailLabel}
+              </label>
+              <input
+                type="email"
+                required
+                className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
 
-          {error && (
-            <p className="text-sm text-red-400">
-              {error}
-            </p>
-          )}
+            <div>
+              <label className="block text-sm mb-1 font-medium">
+                {t.passwordLabel}
+              </label>
+              <input
+                type="password"
+                required
+                className="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            {submitting ? t.registering : t.submit}
-          </button>
-        </form>
+            {error && (
+              <p className="text-sm text-red-400">
+                {error}
+              </p>
+            )}
 
-        <p className="mt-4 text-xs text-slate-400">
-          {t.noAccount}{" "}
-          <Link
-            href="/signup"
-            className="font-semibold text-emerald-400 hover:underline"
-          >
-            {t.goSignup}
-          </Link>
-        </p>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              {submitting ? t.registering : t.submit}
+            </button>
+          </form>
+
+          <p className="mt-4 text-xs text-slate-400">
+            {t.noAccount}{" "}
+            <Link
+              href="/signup"
+              className="font-semibold text-emerald-400 hover:underline"
+            >
+              {t.goSignup}
+            </Link>
+          </p>
+        </div>
       </div>
     </main>
   );
