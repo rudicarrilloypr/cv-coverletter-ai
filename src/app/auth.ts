@@ -8,7 +8,6 @@ import bcrypt from "bcryptjs";
 export const { auth, handlers, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma) as any,
 
-  // 👇 IMPORTANTE para Credentials
   session: {
     strategy: "jwt",
   },
@@ -31,17 +30,20 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
           return null;
         }
 
-        // Buscar usuario por email
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         });
 
-        // Si no existe o no tiene password guardado → null
         if (!user || !user.password) {
           return null;
         }
 
-        // Comparar password plano vs hash
+        // 👇 BLOQUEAR si el correo no está verificado
+        if (!user.emailVerified) {
+          // podríamos lanzar un error más específico luego
+          return null;
+        }
+
         const isValid = await bcrypt.compare(
           credentials.password,
           user.password
@@ -51,7 +53,6 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
           return null;
         }
 
-        // Lo que retornes aquí se agrega al JWT
         return {
           id: user.id,
           email: user.email,
@@ -61,21 +62,18 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     }),
   ],
 
-  // 👇 Para que `signIn("credentials")` use tu página de login
   pages: {
     signIn: "/login",
   },
 
   callbacks: {
     async jwt({ token, user }) {
-      // Cuando el usuario hace login, 'user' viene definido 1 sola vez
       if (user) {
         token.userId = (user as any).id;
       }
       return token;
     },
     async session({ session, token }) {
-      // Pasamos el id al objeto session.user
       if (token?.userId && session.user) {
         (session.user as any).id = token.userId;
       }
